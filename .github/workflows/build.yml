@@ -35,6 +35,7 @@ jobs:
           p = Path("shift-alarm/android/app/src/main/java/com/shiftalarm/app/MainActivity.kt")
           s = p.read_text(encoding="utf-8")
           fixes = {
+                  "Switch(this).apply": "Switch(this@MainActivity).apply",
               "fillViewport=true": "isFillViewport=true",
               "val r=arr.getJSONObject(i),item=card()": "val r=arr.getJSONObject(i);val item=card()",
               'val j=Engine.data(this),arr=j.getJSONArray("rules")': 'val j=Engine.data(this);val arr=j.getJSONArray("rules")',
