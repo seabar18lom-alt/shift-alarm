@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
+concurrency:
+  group: shift-alarm-release
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -32,13 +39,8 @@ jobs:
       - name: Extract source
         run: unzip -o -q shift-alarm-github.zip
 
-      - name: Build APK
-        working-directory: shift-alarm/android
-        run: gradle :app:assembleDebug --no-daemon --stacktrace
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: shift-alarm-apk
-          path: shift-alarm/android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
+      - name: Restore signing key
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run:
