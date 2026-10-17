@@ -24,10 +24,27 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
           echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
-          ls "$ANDROID_SDK_ROOT"
 
       - name: Extract source
         run: unzip -q shift-alarm-github.zip
+
+      - name: Fix Kotlin source errors
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("shift-alarm/android/app/src/main/java/com/shiftalarm/app/MainActivity.kt")
+          s = p.read_text(encoding="utf-8")
+          fixes = {
+              "fillViewport=true": "isFillViewport=true",
+              "val r=arr.getJSONObject(i),item=card()": "val r=arr.getJSONObject(i);val item=card()",
+              'val j=Engine.data(this),arr=j.getJSONArray("rules")': 'val j=Engine.data(this);val arr=j.getJSONArray("rules")',
+          }
+          for old, new in fixes.items():
+              if old not in s:
+                  raise SystemExit("Cannot find source to fix: " + old)
+              s = s.replace(old, new)
+          p.write_text(s, encoding="utf-8")
+          PY
 
       - name: Build APK
         working-directory: shift-alarm/android
