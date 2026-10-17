@@ -8,15 +8,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
@@ -26,32 +30,14 @@ jobs:
           echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
 
       - name: Extract source
-        run: unzip -q shift-alarm-github.zip
-
-      - name: Fix Kotlin source errors
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("shift-alarm/android/app/src/main/java/com/shiftalarm/app/MainActivity.kt")
-          s = p.read_text(encoding="utf-8")
-          fixes = {
-                  "Switch(this).apply": "Switch(this@MainActivity).apply",
-              "fillViewport=true": "isFillViewport=true",
-              "val r=arr.getJSONObject(i),item=card()": "val r=arr.getJSONObject(i);val item=card()",
-              'val j=Engine.data(this),arr=j.getJSONArray("rules")': 'val j=Engine.data(this);val arr=j.getJSONArray("rules")',
-          }
-          for old, new in fixes.items():
-              if old not in s:
-                  raise SystemExit("Cannot find source to fix: " + old)
-              s = s.replace(old, new)
-          p.write_text(s, encoding="utf-8")
-          PY
+        run: unzip -o -q shift-alarm-github.zip
 
       - name: Build APK
         working-directory: shift-alarm/android
-        run: gradle :app:assembleDebug --no-daemon
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: shift-alarm-apk
           path: shift-alarm/android/app/build/outputs/apk/debug/*.apk
