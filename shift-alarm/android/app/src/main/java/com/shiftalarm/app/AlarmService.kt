@@ -22,7 +22,7 @@ class AlarmService:Service(){
    .setContentTitle("교대알람 · ${intent.getStringExtra("title")?:"근무 알람"}")
    .setContentText("알람 종료를 누르면 소리가 멈춥니다.").setCategory(Notification.CATEGORY_ALARM)
    .setVisibility(Notification.VISIBILITY_PUBLIC).setOngoing(true).setContentIntent(open).setFullScreenIntent(open,true)
-   .addAction(Notification.Action.Builder(null,"알람 종료",stop).build()).build()
+   .apply { if (!getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false)) addAction(Notification.Action.Builder(null,"알람 종료",stop).build()) }.build()
   if(Build.VERSION.SDK_INT>=29)startForeground(100,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)else startForeground(100,notification)
   if(player==null){
    wakeLock=getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"shiftalarm:ring").apply{acquire(10*60*1000L)}
