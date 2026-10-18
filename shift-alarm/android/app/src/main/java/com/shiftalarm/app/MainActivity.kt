@@ -337,6 +337,12 @@ class MainActivity:Activity(){
    val uri=data?.getParcelableExtra<android.net.Uri>(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI)?:return
    val title=android.media.RingtoneManager.getRingtone(this,uri)?.getTitle(this)?:"선택한 알람음"
    AlarmAudio.prefs(this).edit().putString("uri",uri.toString()).putString("title",title).apply();showSettings()
+  }else if(requestCode==83){
+   val uri=data?.data?:return
+   try{previewShiftPdf(ShiftPdfImport.parse(this,uri))}
+   catch(e:Exception){AlertDialog.Builder(this).setTitle("근무표를 읽지 못했어요")
+    .setMessage((e.message?:"이 PDF 형식은 아직 지원되지 않아요")+"\\n텍스트가 들어 있는 표형 PDF부터 지원합니다.")
+    .setPositiveButton("확인",null).show()}
   }else if(requestCode==82){
    val uri=data?.data?:return
    try{
@@ -393,8 +399,69 @@ class MainActivity:Activity(){
   section("알람 소리와 진동","알람음 · 음악 파일 · 음량 · 진동"){showAudioDialog()}
   section("알람 해제 미션","문제 방식 · 난이도 · 적용할 알람"){showChallengeDialog()}
   section("근무표 설정","반복 패턴 · 근무 유형 · 시작 시간"){showWorkSettingsDialog()}
+  section("근무표 파일 가져오기","PDF 선택 · 이름 선택 · 미리보기"){pickShiftPdf()}
   section("권한 관리","전체 화면 · 정확한 알람 · 알림 권한"){showPermissionsDialog()}
-  section("알람 관리","예약된 알람 다시 등록"){Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()}
+  section("알람 관리","알람 다시 예약 (확인 후 실행)"){
+   AlertDialog.Builder(this).setTitle("알람을 다시 예약할까요?")
+    .setMessage("현재 근무표와 알람 규칙을 기준으로 예약된 알람을 갱신합니다. 근무표와 설정은 삭제되지 않습니다.")
+    .setNegativeButton("취소",null)
+    .setPositiveButton("다시 예약"){_,_->Engine.schedule(this);Toast.makeText(this,"알람 예약을 갱신했습니다.",Toast.LENGTH_LONG).show()}
+    .show()
+  }
+ }
+ private fun pickShiftPdf(){
+  val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+   .setType("application/pdf").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+  try{startActivityForResult(intent,83)}
+  catch(_:Exception){Toast.makeText(this,"PDF 파일 선택 화면을 열지 못했어요",Toast.LENGTH_LONG).show()}
+ }
+ private fun previewShiftPdf(result:ShiftPdfImport.Result){
+  val names=result.names.toTypedArray()
+  AlertDialog.Builder(this).setTitle("근무표에서 내 이름 선택")
+   .setItems(names){_,index->previewPersonShifts(result,names[index])}
+   .setNegativeButton("취소",null).show()
+ }
+ private fun previewPersonShifts(result:ShiftPdfImport.Result,person:String){
+  val parsed=result.assignments.associate{assignment->
+   val type=when(person){
+    assignment.daytime->"주간"
+    assignment.nighttime->"야간"
+    else->"휴무"
+   }
+   assignment.date to type
+  }
+  val total=parsed.values.groupingBy{it}.eachCount()
+  val preview=layout().apply{setPadding(dp(16),dp(8),dp(16),dp(8))}
+  preview.addView(text("$person · ${result.year}년 ${result.month}월",17,true))
+  preview.addView(text("주간 ${total["주간"]?:0}일 · 야간 ${total["야간"]?:0}일 · 휴무 ${total["휴무"]?:0}일",13,false,gray),inset(0,8,0,9))
+  val scroll=ScrollView(this)
+  val lines=layout()
+  for((day,type) in parsed){
+   lines.addView(text("${day.dayOfMonth}일   $type",14,false,when(type){"주간"->blue;"야간"->Color.rgb(118,81,181);else->gray}),inset(0,2,0,2))
+  }
+  scroll.addView(lines)
+  preview.addView(scroll,LinearLayout.LayoutParams(-1,dp(280)))
+  preview.addView(text("PDF에서 읽지 못한 날짜는 변경하지 않아요. 적용하기 전에 일정을 반드시 확인하세요.",12,false,gray),inset(0,9,0,0))
+  AlertDialog.Builder(this).setTitle("근무표 적용 전 미리보기").setView(preview)
+   .setNegativeButton("취소",null)
+   .setPositiveButton("이 근무표 적용"){_,_->
+    val j=Engine.data(this)
+    val existing=Engine.shiftTypes(j)
+    val types=j.optJSONArray("customShifts")?:JSONArray()
+    for(type in listOf("주간","야간"))if(type !in existing)types.put(type)
+    j.put("customShifts",types)
+    val times=j.optJSONObject("shiftTimes")?:JSONObject()
+    if(!times.has("주간"))times.put("주간",480)
+    if(!times.has("야간"))times.put("야간",1200)
+    j.put("shiftTimes",times)
+    val overrides=j.getJSONObject("overrides")
+    for((day,type) in parsed)overrides.put(day.toString(),type)
+    Engine.save(this,j);Engine.schedule(this)
+    month=YearMonth.of(result.year,result.month)
+    selected=parsed.keys.firstOrNull()?:selected
+    showHome()
+    Toast.makeText(this,"${parsed.size}일 근무표를 반영했어요",Toast.LENGTH_LONG).show()
+   }.show()
  }
  private fun showAudioDialog(){
   val scroll=ScrollView(this)
