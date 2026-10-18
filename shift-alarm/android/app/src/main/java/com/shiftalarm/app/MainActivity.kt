@@ -341,7 +341,7 @@ class MainActivity:Activity(){
    val uri=data?.data?:return
    try{previewShiftPdf(ShiftPdfImport.parse(this,uri))}
    catch(e:Exception){AlertDialog.Builder(this).setTitle("근무표를 읽지 못했어요")
-    .setMessage((e.message?:"이 PDF 형식은 아직 지원되지 않아요")+"\\n텍스트가 들어 있는 표형 PDF부터 지원합니다.")
+    .setMessage((e.message?:"이 PDF 형식은 아직 지원되지 않아요")+"\n텍스트가 들어 있는 표형 PDF부터 지원합니다.")
     .setPositiveButton("확인",null).show()}
   }else if(requestCode==82){
    val uri=data?.data?:return
