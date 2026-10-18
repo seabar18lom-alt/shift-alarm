@@ -17,7 +17,7 @@ object ShiftPdfImport {
  fun parse(context:Context,uri:Uri):Result {
   PDFBoxResourceLoader.init(context.applicationContext)
   val input=context.contentResolver.openInputStream(uri)?:error("PDF를 열 수 없습니다")
-  input.use{stream->PDDocument.load(stream).use{document->
+  return input.use{stream->PDDocument.load(stream).use{document->
    require(document.numberOfPages>0){"PDF 페이지가 없습니다"}
    val glyphs=mutableListOf<Glyph>()
    val stripper=object:PDFTextStripper(){
