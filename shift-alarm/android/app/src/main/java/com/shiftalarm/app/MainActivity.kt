@@ -44,12 +44,32 @@ class MainActivity:Activity(){
   body.addView(hero,inset(0,0,0,26))
   val quick=card()
   quick.addView(text("빠른 알람",19,true),inset(0,0,0,8))
-  val quickRow=layout(false)
-  for((label,mins) in listOf("5분" to 5,"15분" to 15,"30분" to 30,"1시간" to 60)){
-   quickRow.addView(btn(label){setQuickAlarm(mins)},LinearLayout.LayoutParams(0,dp(48),1f))
-  }
-  quick.addView(quickRow)
   val quickPrefs=getSharedPreferences("quick_alarm",0)
+  var minutes=quickPrefs.getInt("selected_minutes",15).coerceIn(5,1440)
+  minutes=((minutes+4)/5)*5
+  fun quickLabel(value:Int):String=if(value<60) "${value}분" else if(value%60==0) "${value/60}시간" else "${value/60}시간 ${value%60}분"
+  val quickRow=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+  val display=btn(quickLabel(minutes)){}
+  fun updateQuick(value:Int){
+   minutes=value.coerceIn(5,1440)
+   quickPrefs.edit().putInt("selected_minutes",minutes).apply()
+   display.text=quickLabel(minutes)+"  ▾"
+  }
+  val down=btn("−"){updateQuick(minutes-5)}
+  val up=btn("+"){updateQuick(minutes+5)}
+  display.setOnClickListener{
+   val values=(1..288).map{it*5}
+   AlertDialog.Builder(this).setTitle("빠른 알람 시간 선택")
+    .setSingleChoiceItems(values.map{quickLabel(it)}.toTypedArray(),(minutes/5)-1){dialog,which->
+     updateQuick(values[which]);dialog.dismiss()
+    }.setNegativeButton("취소",null).show()
+  }
+  updateQuick(minutes)
+  quickRow.addView(down,LinearLayout.LayoutParams(dp(58),dp(52)))
+  quickRow.addView(display,LinearLayout.LayoutParams(0,dp(52),1f))
+  quickRow.addView(up,LinearLayout.LayoutParams(dp(58),dp(52)))
+  quick.addView(quickRow)
+  quick.addView(btn("이 시간으로 알람 설정"){setQuickAlarm(minutes)},inset(0,10,0,0))
   val quickAt=quickPrefs.getLong("time",0L)
   if(quickAt>System.currentTimeMillis()){
    quick.addView(text("예약됨: "+java.time.Instant.ofEpochMilli(quickAt).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("M월 d일 HH:mm")),13,false,gray),inset(0,10,0,4))
