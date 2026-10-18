@@ -276,5 +276,28 @@ class MainActivity:Activity(){
   row.addView(btn("정지"){stopPreview()},LinearLayout.LayoutParams(0,-2,1f));box.addView(row)
   return box
  }
- private fun showSettings(){init("설정");body.addView(audioSettings(),inset(0,0,0,16));val challenge=card();challenge.addView(text("알람 해제 미션",19,true));val challengeToggle=Switch(this).apply{text="수학 문제를 풀어야 알람 종료";isChecked=getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false);setOnCheckedChangeListener{_,enabled->getSharedPreferences("alarm_options",0).edit().putBoolean("math_to_dismiss",enabled).apply()}};challenge.addView(challengeToggle);challenge.addView(text("끄면 종료 버튼만 누르면 되고, 켜면 문제 1개를 맞혀야 합니다.",12,false,gray));body.addView(challenge,inset(0,0,0,16));val card=card();card.addView(btn("반복 패턴 변경") {patternDialog()},inset(0,0,0,8));card.addView(btn("근무 시작 시간 변경") {shiftTimeDialog()},inset(0,0,0,8));card.addView(btn("정확한 알람 권한 열기") {if(Build.VERSION.SDK_INT>=31)try{startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))}catch(_:Exception){Toast.makeText(this,"시스템 설정에서 알람 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}else Toast.makeText(this,"이 버전에서는 별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()},inset(0,0,0,8));card.addView(btn("알람 다시 예약") {Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()});body.addView(card);body.addView(text("알림 및 정확한 알람 권한을 허용해야 안정적으로 울립니다. 휴대폰 제조사별 절전 정책, 전체 화면 알림 정책의 영향을 받을 수 있으니 실제 기기로 테스트하세요.",13,false,gray),inset(2,16,2,0))}
+ private fun showSettings(){init("설정");body.addView(audioSettings(),inset(0,0,0,16));val challenge=card();challenge.addView(text("알람 해제 미션",19,true));val challengeToggle=Switch(this).apply{text="수학 문제를 풀어야 알람 종료";isChecked=getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false);setOnCheckedChangeListener{_,enabled->getSharedPreferences("alarm_options",0).edit().putBoolean("math_to_dismiss",enabled).apply()}};challenge.addView(challengeToggle);challenge.addView(text("사용할 알람을 아래에서 각각 선택하세요.",12,false,gray))
+  val options=getSharedPreferences("alarm_options",0)
+  val rules=Engine.data(this).getJSONArray("rules")
+  val entries=mutableListOf<Pair<String,String>>()
+  for(k in 0 until rules.length()){
+   val rule=rules.getJSONObject(k)
+   entries.add(rule.getLong("id").toString() to ("${rule.optString("shift")} · ${rule.optString("name")}"))
+  }
+  entries.add("quick" to "빠른 알람")
+  val stored=options.getStringSet("math_alarm_keys",null)
+  for((key,label) in entries){
+   val cb=CheckBox(this).apply{
+    text=label
+    isChecked=stored?.contains(key)?:true
+    setOnCheckedChangeListener{_,checked->
+     val current=options.getStringSet("math_alarm_keys",null)?.toMutableSet()
+      ?:entries.map{it.first}.toMutableSet()
+     if(checked)current.add(key) else current.remove(key)
+     options.edit().putStringSet("math_alarm_keys",current).apply()
+    }
+   }
+   challenge.addView(cb)
+  }
+  challenge.addView(text("전체 스위치를 끄면 선택한 항목과 관계없이 일반 종료 버튼이 표시돼요.",12,false,gray));body.addView(challenge,inset(0,0,0,16));val card=card();card.addView(btn("반복 패턴 변경") {patternDialog()},inset(0,0,0,8));card.addView(btn("근무 시작 시간 변경") {shiftTimeDialog()},inset(0,0,0,8));card.addView(btn("정확한 알람 권한 열기") {if(Build.VERSION.SDK_INT>=31)try{startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))}catch(_:Exception){Toast.makeText(this,"시스템 설정에서 알람 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}else Toast.makeText(this,"이 버전에서는 별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()},inset(0,0,0,8));card.addView(btn("알람 다시 예약") {Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()});body.addView(card);body.addView(text("알림 및 정확한 알람 권한을 허용해야 안정적으로 울립니다. 휴대폰 제조사별 절전 정책, 전체 화면 알림 정책의 영향을 받을 수 있으니 실제 기기로 테스트하세요.",13,false,gray),inset(2,16,2,0))}
 }
