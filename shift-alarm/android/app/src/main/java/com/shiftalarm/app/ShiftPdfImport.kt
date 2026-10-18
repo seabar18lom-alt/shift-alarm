@@ -45,15 +45,16 @@ object ShiftPdfImport {
    }
    val plain=stripper.getText(document)
    val match=Regex("(20\\d{2})년\\s*(\\d{1,2})월").find(plain)
+      ?:Regex("(20\\d{2})\\s+(1[0-2]|[1-9])").find(plain)
       ?:error("연도와 월을 찾을 수 없습니다")
    val year=match.groupValues[1].toInt();val month=match.groupValues[2].toInt()
    val maxDay=LocalDate.of(year,month,1).lengthOfMonth()
    // Only date cells within the top timetable region; ignore footer contact numbers.
-   val days=words.filter{w->val n=w.text.toIntOrNull();n!=null&&n in 1..maxDay&&w.y<document.getPage(0).mediaBox.height*0.7f}
+   val days=words.filter{w->val n=w.text.toIntOrNull();n!=null&&n in 1..maxDay&&w.y<document.getPage(0).mediaBox.height*0.6f}
    fun nameFor(day:Word,above:Boolean):String?{
-    val target=day.y+(if(above)-12f else 14f)
+    val target=day.y+(if(above)-14f else 10f)
     return words.filter{w->
-     abs(w.y-target)<9f && (w.x-day.x) in 22f..76f &&
+     abs(w.y-target)<9f && (w.x-day.x) in 25f..85f &&
       w.text.matches(Regex("[가-힣]{2,5}"))
     }.minByOrNull{abs(it.y-target)}?.text
    }
