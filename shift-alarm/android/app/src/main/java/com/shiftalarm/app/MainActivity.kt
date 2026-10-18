@@ -316,5 +316,12 @@ class MainActivity:Activity(){
    }
    challenge.addView(cb)
   }
-  challenge.addView(text("전체 스위치를 끄면 선택한 항목과 관계없이 일반 종료 버튼이 표시돼요.",12,false,gray));body.addView(challenge,inset(0,0,0,16));val card=card();card.addView(btn("반복 패턴 변경") {patternDialog()},inset(0,0,0,8));card.addView(btn("근무 시작 시간 변경") {shiftTimeDialog()},inset(0,0,0,8));card.addView(btn("정확한 알람 권한 열기") {if(Build.VERSION.SDK_INT>=31)try{startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))}catch(_:Exception){Toast.makeText(this,"시스템 설정에서 알람 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}else Toast.makeText(this,"이 버전에서는 별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()},inset(0,0,0,8));card.addView(btn("알람 다시 예약") {Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()});body.addView(card);body.addView(text("알림 및 정확한 알람 권한을 허용해야 안정적으로 울립니다. 휴대폰 제조사별 절전 정책, 전체 화면 알림 정책의 영향을 받을 수 있으니 실제 기기로 테스트하세요.",13,false,gray),inset(2,16,2,0))}
+  challenge.addView(text("전체 스위치를 끄면 선택한 항목과 관계없이 일반 종료 버튼이 표시돼요.",12,false,gray));body.addView(challenge,inset(0,0,0,16));val card=card();card.addView(btn("반복 패턴 변경") {patternDialog()},inset(0,0,0,8));card.addView(btn("근무 시작 시간 변경") {shiftTimeDialog()},inset(0,0,0,8));card.addView(btn("알람 전체 화면 표시 권한"){
+  if(Build.VERSION.SDK_INT>=34){
+   try{
+    startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").setData(android.net.Uri.parse("package:$packageName")))
+   }catch(_:Exception){Toast.makeText(this,"설정에서 앱의 전체 화면 알림 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}
+  }else Toast.makeText(this,"이 기기는 별도의 전체 화면 권한 설정이 없을 수 있어요",Toast.LENGTH_LONG).show()
+ },inset(0,0,0,8))
+ card.addView(btn("정확한 알람 권한 열기") {if(Build.VERSION.SDK_INT>=31)try{startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))}catch(_:Exception){Toast.makeText(this,"시스템 설정에서 알람 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}else Toast.makeText(this,"이 버전에서는 별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()},inset(0,0,0,8));card.addView(btn("알람 다시 예약") {Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()});body.addView(card);body.addView(text("알림 및 정확한 알람 권한을 허용해야 안정적으로 울립니다. 휴대폰 제조사별 절전 정책, 전체 화면 알림 정책의 영향을 받을 수 있으니 실제 기기로 테스트하세요.",13,false,gray),inset(2,16,2,0))}
 }
