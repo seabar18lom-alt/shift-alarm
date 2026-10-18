@@ -27,10 +27,15 @@ object ShiftPdfImport {
    }
    stripper.sortByPosition=true
    stripper.startPage=1;stripper.endPage=1;stripper.getText(document)
+   // Text in this PDF is drawn twice at the same position. Keep only one
+   // occurrence of each overlapping glyph, while preserving real repeated letters.
+   val uniqueGlyphs=glyphs.distinctBy { g ->
+    "${g.text}:${(g.x*2).toInt()}:${(g.y*2).toInt()}"
+   }
    val words=mutableListOf<Word>()
    // PDFBox coordinates are screen-style y positions. Group characters by baseline.
    val lines=mutableListOf<MutableList<Glyph>>()
-   for(g in glyphs.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x})){
+   for(g in uniqueGlyphs.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x})){
     val line=lines.lastOrNull()
     if(line==null||abs(line.first().y-g.y)>3f)lines.add(mutableListOf(g)) else line.add(g)
    }
@@ -45,7 +50,7 @@ object ShiftPdfImport {
    }
    val plain=stripper.getText(document)
    // Prefer coordinates over extraction order for split heading glyphs.
-   val heading=glyphs.filter{it.y<110f}.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x}).joinToString(""){it.text}
+   val heading=uniqueGlyphs.filter{it.y<110f}.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x}).joinToString(""){it.text}
    val normalized=heading.replace(Regex("\\s+"),"")
    val first=Regex("(20\\d{2})년(1[0-2]|0?[1-9])월").find(normalized)
       ?:Regex("(20\\d{2}).{0,8}?(1[0-2]|0?[1-9])월").find(normalized)
