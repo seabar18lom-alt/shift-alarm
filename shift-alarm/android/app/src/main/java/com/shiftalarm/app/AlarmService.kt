@@ -12,14 +12,16 @@ class AlarmService:Service(){
  private var wakeLock:PowerManager.WakeLock?=null
  override fun onBind(intent:Intent?)=null
  override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int{
-  if(intent?.action==STOP){stopSelf();return START_NOT_STICKY}
+  if(intent?.action==STOP){getSharedPreferences("alarm_session",0).edit().putBoolean("active",false).apply();stopSelf();return START_NOT_STICKY}
   if(intent==null){stopSelf();return START_NOT_STICKY}
   Engine.channel(this)
+  val session=System.currentTimeMillis().toString()+"-"+startId
+  getSharedPreferences("alarm_session",0).edit().putString("id",session).putBoolean("active",true).commit()
   val options=getSharedPreferences("alarm_options",0)
   val selected=options.getStringSet("math_alarm_keys",null)
   val alarmKey=intent.getStringExtra("alarm_key")?:""
   val challenge=options.getBoolean("math_to_dismiss",false) && (selected?.contains(alarmKey)?:true)
-  val screen=Intent(this,RingingActivity::class.java).putExtra("title",intent.getStringExtra("title")?:"근무 알람").putExtra("challenge",challenge).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+  val screen=Intent(this,RingingActivity::class.java).putExtra("title",intent.getStringExtra("title")?:"근무 알람").putExtra("challenge",challenge).putExtra("session",session).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
   val open=PendingIntent.getActivity(this,0,screen,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
   val stop=PendingIntent.getService(this,1,Intent(this,AlarmService::class.java).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
   val notification=Notification.Builder(this,Engine.CHANNEL).setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
@@ -39,6 +41,7 @@ class AlarmService:Service(){
   return START_NOT_STICKY
  }
  override fun onDestroy(){
+  getSharedPreferences("alarm_session",0).edit().putBoolean("active",false).apply()
   player?.release();player=null;vibrator?.cancel()
   wakeLock?.let{if(it.isHeld)it.release()};wakeLock=null
   stopForeground(STOP_FOREGROUND_REMOVE);super.onDestroy()
