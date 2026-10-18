@@ -29,7 +29,7 @@ class RingingActivity:Activity(){
   }
   bg.addView(h)
   bg.addView(title)
-  if(getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false)){
+  if(intent.getBooleanExtra("challenge",false)){
    val a=Random.nextInt(2,20)
    val b=Random.nextInt(2,20)
    val multiply=Random.nextBoolean()
