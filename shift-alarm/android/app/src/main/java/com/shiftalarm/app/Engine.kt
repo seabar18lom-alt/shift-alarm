@@ -10,6 +10,15 @@ import java.time.format.DateTimeFormatter
 object Engine {
     const val CHANNEL="shift_alarm_channel_v2"
     val types = listOf("주간", "야간", "휴무", "특근")
+    fun shiftTypes(j:JSONObject):List<String>{
+        val result=types.toMutableList()
+        val extra=j.optJSONArray("customShifts")
+        if(extra!=null)for(i in 0 until extra.length()){
+            val name=extra.optString(i).trim()
+            if(name.isNotEmpty()&&!result.contains(name))result.add(name)
+        }
+        return result
+    }
     fun data(c:Context): JSONObject {
         val raw=c.getSharedPreferences("shift",0).getString("data",null)
         if(raw!=null) return try { JSONObject(raw) } catch(_:Exception){ defaultData() }
