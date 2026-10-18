@@ -10,8 +10,12 @@ import android.widget.*
 import kotlin.random.Random
 
 class RingingActivity:Activity(){
+ private fun sessionValid():Boolean { val prefs=getSharedPreferences("alarm_session",0);return prefs.getBoolean("active",false)&&prefs.getString("id",null)==intent.getStringExtra("session") }
+ override fun onResume(){super.onResume();if(!sessionValid())finishAndRemoveTask()}
+ override fun onNewIntent(newIntent:Intent){super.onNewIntent(newIntent);setIntent(newIntent);recreate()}
  override fun onCreate(savedInstanceState:Bundle?){
   super.onCreate(savedInstanceState)
+  if(!sessionValid()){finishAndRemoveTask();return}
   setShowWhenLocked(true)
   setTurnScreenOn(true)
   window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -80,5 +84,5 @@ class RingingActivity:Activity(){
   }
   setContentView(bg)
  }
- private fun stop(){stopService(Intent(this,AlarmService::class.java))}
+ private fun stop(){getSharedPreferences("alarm_session",0).edit().putBoolean("active",false).commit();startService(Intent(this,AlarmService::class.java).setAction(AlarmService.STOP));finishAndRemoveTask()}
 }
