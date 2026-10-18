@@ -44,10 +44,18 @@ object ShiftPdfImport {
     if(token.isNotEmpty())words.add(Word(token,tokenX,line.first().y))
    }
    val plain=stripper.getText(document)
-   val match=Regex("(20\\d{2})년\\s*(\\d{1,2})월").find(plain)
-      ?:Regex("(20\\d{2})\\s+(1[0-2]|[1-9])").find(plain)
-      ?:error("연도와 월을 찾을 수 없습니다")
-   val year=match.groupValues[1].toInt();val month=match.groupValues[2].toInt()
+   // Prefer coordinates over extraction order for split heading glyphs.
+   val heading=glyphs.filter{it.y<110f}.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x}).joinToString(""){it.text}
+   val normalized=heading.replace(Regex("\\s+"),"")
+   val first=Regex("(20\\d{2})년(1[0-2]|0?[1-9])월").find(normalized)
+      ?:Regex("(20\\d{2}).{0,8}?(1[0-2]|0?[1-9])월").find(normalized)
+      ?:Regex("(20\\d{2})년\\s*(\\d{1,2})월").find(plain)
+   val year=first?.groupValues?.get(1)?.toIntOrNull()
+      ?:Regex("20\\d{2}").find(normalized)?.value?.toIntOrNull()
+      ?:error("연도를 찾지 못했어요. 제목 추출: "+normalized.take(65))
+   val month=first?.groupValues?.get(2)?.toIntOrNull()
+      ?:Regex("(1[0-2]|0?[1-9])월").find(normalized)?.groupValues?.get(1)?.toIntOrNull()
+      ?:error("월을 찾지 못했어요. 제목 추출: "+normalized.take(65))
    val maxDay=LocalDate.of(year,month,1).lengthOfMonth()
    // Only date cells within the top timetable region; ignore footer contact numbers.
    val days=words.filter{w->val n=w.text.toIntOrNull();n!=null&&n in 1..maxDay&&w.y<document.getPage(0).mediaBox.height*0.6f}
@@ -62,7 +70,7 @@ object ShiftPdfImport {
     val n=w.text.toIntOrNull()?:return@mapNotNull null
     Assignment(LocalDate.of(year,month,n),nameFor(w,true),nameFor(w,false))
    }.distinctBy{it.date}.sortedBy{it.date}
-   require(assignments.size>=7&&assignments.any{it.daytime!=null||it.nighttime!=null}){"이 PDF 근무표 배치를 인식하지 못했습니다"}
+   require(assignments.size>=20&&assignments.count{it.daytime!=null&&it.nighttime!=null}>=15){"이 PDF 근무표 배치를 인식하지 못했습니다"}
    val names=assignments.flatMap{listOfNotNull(it.daytime,it.nighttime)}.distinct().sorted()
    require(names.isNotEmpty()){"직원 이름을 찾을 수 없습니다"}
    Result(assignments,names,year,month)
