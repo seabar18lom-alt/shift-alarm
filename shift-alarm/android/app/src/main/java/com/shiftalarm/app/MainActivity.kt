@@ -77,15 +77,66 @@ class MainActivity:Activity(){
   }
   body.addView(quick,inset(0,0,0,20))
   val header=layout(false).apply{gravity=Gravity.CENTER_VERTICAL};header.addView(text("근무 캘린더",19,true),LinearLayout.LayoutParams(0,-2,1f));header.addView(btn("패턴 설정") {patternDialog()});body.addView(header,inset(0,0,0,10))
-  val cal=card();val bar=layout(false).apply{gravity=Gravity.CENTER_VERTICAL};bar.addView(btn("‹"){month=month.minusMonths(1);showHome()});bar.addView(text(month.format(DateTimeFormatter.ofPattern("yyyy년 M월")),16,true).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(0,-2,1f));bar.addView(btn("›"){month=month.plusMonths(1);showHome()});cal.addView(bar)
-  val grid=GridLayout(this).apply{columnCount=7};listOf("일","월","화","수","목","금","토").forEach{grid.addView(text(it,12,true,gray).apply{gravity=Gravity.CENTER},GridLayout.LayoutParams().apply{width=0;height=dp(35);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f)})}
-  val first=month.atDay(1).dayOfWeek.value%7;val slots=((month.lengthOfMonth()+first+6)/7)*7
-  for(i in 0 until slots){val date=month.atDay(1).plusDays((i-first).toLong());val shift=Engine.shift(j,date)
-   val cell=layout().apply{gravity=Gravity.CENTER;background=if(date==selected)shape(Color.rgb(232,240,255),11)else shape(Color.TRANSPARENT,11);setOnClickListener{selected=date;shiftDialog(date)}}
-   cell.addView(text(date.dayOfMonth.toString(),12,date==selected,if(date.monthValue==month.monthValue)navy else Color.LTGRAY).apply{gravity=Gravity.CENTER})
-   cell.addView(text(if(date.monthValue==month.monthValue)shift else "",10,true,when(shift){"주간"->blue;"야간"->Color.rgb(118,81,181);else->gray}).apply{gravity=Gravity.CENTER},inset(0,4,0,0))
-   grid.addView(cell,GridLayout.LayoutParams().apply{width=0;height=dp(54);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(dp(1),dp(1),dp(1),dp(1))})
-  };cal.addView(grid);body.addView(cal,inset(0,0,0,25))
+  val cal=card()
+  val bar=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+  bar.addView(btn("‹"){month=month.minusMonths(1);showHome()})
+  bar.addView(text(month.format(DateTimeFormatter.ofPattern("yyyy년 M월")),18,true).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(0,-2,1f))
+  bar.addView(btn("›"){month=month.plusMonths(1);showHome()})
+  cal.addView(bar)
+  val colors=intArrayOf(Color.rgb(75,146,214),Color.rgb(148,113,199),Color.rgb(89,179,125),Color.rgb(238,164,89),Color.rgb(208,112,145),Color.rgb(92,164,174))
+  val known=Engine.shiftTypes(j).filter{it!="휴무"}
+  fun shiftColor(name:String):Int=if(name=="휴무")Color.rgb(152,160,173) else colors[(known.indexOf(name).coerceAtLeast(0))%colors.size]
+  val counts=linkedMapOf<String,Int>()
+  for(dayOfMonth in 1..month.lengthOfMonth()){
+   val shiftName=Engine.shift(j,month.atDay(dayOfMonth))
+   counts[shiftName]=(counts[shiftName]?:0)+1
+  }
+  val legend=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+  for((name,count) in counts){
+   val segment=text("● $name $count  ",11,true,shiftColor(name))
+   legend.addView(segment)
+  }
+  val legendScroll=HorizontalScrollView(this).apply{isHorizontalScrollBarEnabled=false;addView(legend)}
+  cal.addView(legendScroll,inset(0,10,0,10))
+  val grid=GridLayout(this).apply{columnCount=7}
+  listOf("일","월","화","수","목","금","토").forEachIndexed{index,dayName->
+   val color=if(index==0)Color.rgb(210,93,93) else if(index==6)blue else gray
+   grid.addView(text(dayName,12,true,color).apply{gravity=Gravity.CENTER},
+    GridLayout.LayoutParams().apply{width=0;height=dp(34);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f)})
+  }
+  val first=month.atDay(1).dayOfWeek.value%7
+  val slots=((month.lengthOfMonth()+first+6)/7)*7
+  for(i in 0 until slots){
+   val date=month.atDay(1).plusDays((i-first).toLong())
+   val inside=date.monthValue==month.monthValue
+   val shiftName=Engine.shift(j,date)
+   val cell=layout().apply{
+    gravity=Gravity.TOP or Gravity.CENTER_HORIZONTAL
+    val baseColor=if(date==selected)Color.rgb(231,240,255) else if(inside)Color.WHITE else Color.rgb(246,247,249)
+    background=shape(baseColor,9)
+    setPadding(dp(1),dp(5),dp(1),dp(4))
+    setOnClickListener{selected=date;shiftDialog(date)}
+   }
+   val dayColor=if(!inside)Color.LTGRAY else if(i%7==0)Color.rgb(210,93,93) else if(i%7==6)blue else navy
+   cell.addView(text(date.dayOfMonth.toString(),12,date==LocalDate.now(),dayColor).apply{gravity=Gravity.CENTER})
+   if(inside){
+    val label=text(shiftName,10,true,Color.WHITE).apply{
+     gravity=Gravity.CENTER
+     maxLines=2
+     background=shape(shiftColor(shiftName),24)
+     setPadding(dp(1),dp(5),dp(1),dp(5))
+    }
+    cell.addView(label,LinearLayout.LayoutParams(-1,-2).apply{setMargins(0,dp(6),0,0)})
+    if(date==LocalDate.now())cell.addView(text("오늘",9,true,blue).apply{gravity=Gravity.CENTER})
+   }
+   grid.addView(cell,GridLayout.LayoutParams().apply{
+    width=0;height=dp(85)
+    columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f)
+    setMargins(dp(1),dp(1),dp(1),dp(1))
+   })
+  }
+  cal.addView(grid)
+  body.addView(cal,inset(0,0,0,25))
   val row=layout(false).apply{gravity=Gravity.CENTER_VERTICAL};row.addView(text("${selected.monthValue}월 ${selected.dayOfMonth}일 알람",19,true),LinearLayout.LayoutParams(0,-2,1f));row.addView(btn("규칙 관리") {showRules()});body.addView(row,inset(0,0,0,10))
   val list=card();val events=Engine.events(j,selected);if(events.isEmpty())list.addView(text("등록된 알람이 없어요.",13,false,gray))
   for(e in events){val line=layout(false).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(0,dp(9),0,dp(9))};line.addView(text("◷",23,true,blue),LinearLayout.LayoutParams(dp(43),-2));line.addView(text(e.name,15,true),LinearLayout.LayoutParams(0,-2,1f));line.addView(text(Engine.time(e.time),15,true));list.addView(line)}
