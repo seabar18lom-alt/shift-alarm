@@ -376,25 +376,85 @@ class MainActivity:Activity(){
   row.addView(btn("정지"){stopPreview()},LinearLayout.LayoutParams(0,-2,1f));box.addView(row)
   return box
  }
- private fun showSettings(){init("설정");body.addView(audioSettings(),inset(0,0,0,16));val challenge=card();challenge.addView(text("알람 해제 미션",19,true));val challengeToggle=Switch(this).apply{text="수학 문제를 풀어야 알람 종료";isChecked=getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false);setOnCheckedChangeListener{_,enabled->getSharedPreferences("alarm_options",0).edit().putBoolean("math_to_dismiss",enabled).apply()}};challenge.addView(challengeToggle);challenge.addView(text("사용할 알람을 아래에서 각각 선택하세요.",12,false,gray))
+ private fun showSettings(){
+  init("설정")
+  fun section(title:String,description:String,action:()->Unit){
+   val item=card()
+   val line=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+   val labels=layout()
+   labels.addView(text(title,18,true))
+   labels.addView(text(description,12,false,gray),inset(0,5,0,0))
+   line.addView(labels,LinearLayout.LayoutParams(0,-2,1f))
+   line.addView(text("›",27,true,blue))
+   item.addView(line)
+   item.setOnClickListener{action()}
+   body.addView(item,inset(0,0,0,12))
+  }
+  section("알람 소리와 진동","알람음 · 음악 파일 · 음량 · 진동"){showAudioDialog()}
+  section("알람 해제 미션","문제 방식 · 난이도 · 적용할 알람"){showChallengeDialog()}
+  section("근무표 설정","반복 패턴 · 근무 유형 · 시작 시간"){showWorkSettingsDialog()}
+  section("권한 관리","전체 화면 · 정확한 알람 · 알림 권한"){showPermissionsDialog()}
+  section("알람 관리","예약된 알람 다시 등록"){Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()}
+ }
+ private fun showAudioDialog(){
+  val scroll=ScrollView(this)
+  val root=layout().apply{setPadding(dp(14),dp(8),dp(14),dp(8))}
+  root.addView(audioSettings());scroll.addView(root)
+  AlertDialog.Builder(this).setTitle("알람 소리와 진동").setView(scroll)
+   .setPositiveButton("닫기"){_,_->stopPreview();showSettings()}.show()
+ }
+ private fun showWorkSettingsDialog(){
+  val root=layout().apply{setPadding(dp(14),dp(12),dp(14),dp(12))}
+  val dialog=AlertDialog.Builder(this).setTitle("근무표 설정").setView(root).setNegativeButton("닫기",null).create()
+  root.addView(btn("반복 근무 패턴 변경"){dialog.dismiss();patternDialog()})
+  root.addView(btn("근무 유형 · 시작 시간 관리"){dialog.dismiss();shiftTimeDialog()})
+  dialog.show()
+ }
+ private fun showPermissionsDialog(){
+  val root=layout().apply{setPadding(dp(14),dp(12),dp(14),dp(12))}
+  root.addView(btn("전체 화면 알람 권한"){
+   if(Build.VERSION.SDK_INT>=34)try{
+    startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").setData(android.net.Uri.parse("package:$packageName")))
+   }catch(_:Exception){Toast.makeText(this,"휴대폰 설정에서 전체 화면 알림을 허용해 주세요",Toast.LENGTH_LONG).show()}
+   else Toast.makeText(this,"이 기기는 별도 권한이 없을 수 있어요",Toast.LENGTH_SHORT).show()
+  })
+  root.addView(btn("정확한 알람 권한"){
+   if(Build.VERSION.SDK_INT>=31)try{
+    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))
+   }catch(_:Exception){Toast.makeText(this,"시스템 설정에서 정확한 알람을 허용해 주세요",Toast.LENGTH_LONG).show()}
+   else Toast.makeText(this,"별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()
+  })
+  root.addView(btn("알림 권한"){
+   try{startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName))}
+   catch(_:Exception){startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).setData(android.net.Uri.parse("package:$packageName")))}
+  })
+  AlertDialog.Builder(this).setTitle("권한 관리").setView(root).setPositiveButton("닫기",null).show()
+ }
+ private fun showChallengeDialog(){
   val options=getSharedPreferences("alarm_options",0)
-  fun optionPicker(label:String,key:String,values:List<String>,default:Int){
+  val root=layout().apply{setPadding(dp(14),dp(8),dp(14),dp(8))}
+  val enabled=Switch(this).apply{
+   text="문제를 풀어야 알람 종료"
+   isChecked=options.getBoolean("math_to_dismiss",false)
+   setOnCheckedChangeListener{_,value->options.edit().putBoolean("math_to_dismiss",value).apply()}
+  }
+  root.addView(enabled)
+  fun pick(label:String,key:String,values:List<String>){
    val row=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
-   row.addView(text(label,14,true),LinearLayout.LayoutParams(0,-2,1f))
+   row.addView(text(label,15,true),LinearLayout.LayoutParams(0,-2,1f))
    val spinner=Spinner(this).apply{
     adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,values)
-    setSelection(options.getInt(key,default).coerceIn(0,values.lastIndex))
+    setSelection(options.getInt(key,0).coerceIn(0,values.lastIndex))
     onItemSelectedListener=object:AdapterView.OnItemSelectedListener{
      override fun onItemSelected(parent:AdapterView<*>?,view:View?,position:Int,id:Long){options.edit().putInt(key,position).apply()}
      override fun onNothingSelected(parent:AdapterView<*>?){}
     }
    }
    row.addView(spinner)
-   challenge.addView(row,inset(0,10,0,5))
+   root.addView(row,inset(0,15,0,5))
   }
-  optionPicker("정답 방식","math_mode",listOf("객관식","주관식","랜덤"),0)
-  optionPicker("문제 난이도","math_difficulty",listOf("쉬움","보통","어려움"),0)
-  challenge.addView(text("미션을 적용할 알람",14,true),inset(0,12,0,5))
+  pick("정답 방식","math_mode",listOf("객관식","주관식","랜덤"))
+  pick("문제 난이도","math_difficulty",listOf("쉬움","보통","어려움"))
   val rules=Engine.data(this).getJSONArray("rules")
   val entries=mutableListOf<Pair<String,String>>()
   for(k in 0 until rules.length()){
@@ -402,26 +462,22 @@ class MainActivity:Activity(){
    entries.add(rule.getLong("id").toString() to ("${rule.optString("shift")} · ${rule.optString("name")}"))
   }
   entries.add("quick" to "빠른 알람")
-  val stored=options.getStringSet("math_alarm_keys",null)
-  for((key,label) in entries){
-   val cb=CheckBox(this).apply{
-    text=label
-    isChecked=stored?.contains(key)?:true
-    setOnCheckedChangeListener{_,checked->
-     val current=options.getStringSet("math_alarm_keys",null)?.toMutableSet()
-      ?:entries.map{it.first}.toMutableSet()
-     if(checked)current.add(key) else current.remove(key)
-     options.edit().putStringSet("math_alarm_keys",current).apply()
+  val choose=btn("적용할 알람 선택"){
+   val chosen=options.getStringSet("math_alarm_keys",null)?.toMutableSet()
+     ?:entries.map{it.first}.toMutableSet()
+   val checked=BooleanArray(entries.size){chosen.contains(entries[it].first)}
+   AlertDialog.Builder(this).setTitle("미션 적용할 알람 선택")
+    .setMultiChoiceItems(entries.map{it.second}.toTypedArray(),checked){_,index,isChecked->
+     if(isChecked)chosen.add(entries[index].first) else chosen.remove(entries[index].first)
     }
-   }
-   challenge.addView(cb)
+    .setNegativeButton("취소",null)
+    .setPositiveButton("적용"){_,_->options.edit().putStringSet("math_alarm_keys",chosen).apply()}
+    .show()
   }
-  challenge.addView(text("전체 스위치를 끄면 선택한 항목과 관계없이 일반 종료 버튼이 표시돼요.",12,false,gray));body.addView(challenge,inset(0,0,0,16));val card=card();card.addView(btn("반복 패턴 변경") {patternDialog()},inset(0,0,0,8));card.addView(btn("근무 시작 시간 변경") {shiftTimeDialog()},inset(0,0,0,8));card.addView(btn("알람 전체 화면 표시 권한"){
-  if(Build.VERSION.SDK_INT>=34){
-   try{
-    startActivity(Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").setData(android.net.Uri.parse("package:$packageName")))
-   }catch(_:Exception){Toast.makeText(this,"설정에서 앱의 전체 화면 알림 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}
-  }else Toast.makeText(this,"이 기기는 별도의 전체 화면 권한 설정이 없을 수 있어요",Toast.LENGTH_LONG).show()
- },inset(0,0,0,8))
- card.addView(btn("정확한 알람 권한 열기") {if(Build.VERSION.SDK_INT>=31)try{startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))}catch(_:Exception){Toast.makeText(this,"시스템 설정에서 알람 권한을 허용해 주세요",Toast.LENGTH_LONG).show()}else Toast.makeText(this,"이 버전에서는 별도 권한이 필요하지 않아요",Toast.LENGTH_SHORT).show()},inset(0,0,0,8));card.addView(btn("알람 다시 예약") {Engine.schedule(this);Toast.makeText(this,"알람을 다시 예약했어요",Toast.LENGTH_LONG).show()});body.addView(card);body.addView(text("알림 및 정확한 알람 권한을 허용해야 안정적으로 울립니다. 휴대폰 제조사별 절전 정책, 전체 화면 알림 정책의 영향을 받을 수 있으니 실제 기기로 테스트하세요.",13,false,gray),inset(2,16,2,0))}
+  root.addView(choose,inset(0,17,0,6))
+  root.addView(text("선택한 알람에만 문제를 적용합니다. 전체 스위치를 끄면 모든 알람이 일반 종료 방식으로 동작해요.",12,false,gray))
+  val scroll=ScrollView(this).apply{addView(root)}
+  AlertDialog.Builder(this).setTitle("알람 해제 미션").setView(scroll).setPositiveButton("닫기",null).show()
+ }
+
 }
