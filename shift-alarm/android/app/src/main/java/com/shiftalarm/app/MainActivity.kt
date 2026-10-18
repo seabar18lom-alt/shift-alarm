@@ -117,7 +117,7 @@ class MainActivity:Activity(){
   }catch(_:Exception){Toast.makeText(this,"알람을 예약하지 못했어요. 권한을 확인해 주세요",Toast.LENGTH_LONG).show()}
  }
  private fun shiftDialog(date:LocalDate){val choices=Engine.shiftTypes(Engine.data(this)).toTypedArray();val current=Engine.shift(Engine.data(this),date);AlertDialog.Builder(this).setTitle("${date} 근무 지정").setSingleChoiceItems(choices,choices.indexOf(current)){dialog,index->val j=Engine.data(this);j.getJSONObject("overrides").put(date.toString(),choices[index]);Engine.save(this,j);Engine.schedule(this);dialog.dismiss();showHome()}.setNeutralButton("반복 패턴 복원"){_,_->val j=Engine.data(this);j.getJSONObject("overrides").remove(date.toString());Engine.save(this,j);Engine.schedule(this);showHome()}.setNegativeButton("취소",null).show()}
- private fun patternDialog(){val j=Engine.data(this);val view=layout().apply{setPadding(dp(20),dp(12),dp(20),0)};val anchor=EditText(this).apply{setText(j.getString("anchor"));hint="2026-10-18"};val pattern=EditText(this).apply{setText((0 until j.getJSONArray("pattern").length()).joinToString(", "){j.getJSONArray("pattern").getString(it)});hint="주간, 야간, 휴무, 휴무"};view.addView(text("기준 날짜 (YYYY-MM-DD)",13));view.addView(anchor);view.addView(text("반복 순서 (쉼표 구분)",13));view.addView(pattern)
+ private fun patternDialog(){val j=Engine.data(this);val view=layout().apply{setPadding(dp(20),dp(12),dp(20),0)};val anchor=EditText(this).apply{setText(j.getString("anchor"));hint="2026-10-18"};val pattern=EditText(this).apply{setText((0 until j.getJSONArray("pattern").length()).joinToString(", "){j.getJSONArray("pattern").getString(it)});hint="예: 데이, 이브닝, 나이트, 휴무"};view.addView(text("기준 날짜 (YYYY-MM-DD)",13));view.addView(anchor);view.addView(text("반복 순서 (쉼표 구분)",13));view.addView(pattern)
   AlertDialog.Builder(this).setTitle("근무 반복 패턴").setView(view).setNegativeButton("취소",null).setPositiveButton("저장"){_,_->try{LocalDate.parse(anchor.text.toString());val arr=pattern.text.toString().split(",").map{it.trim()};require(arr.isNotEmpty()&&arr.all{it in Engine.shiftTypes(j)});j.put("anchor",anchor.text.toString());j.put("pattern",JSONArray(arr));Engine.save(this,j);Engine.schedule(this);showHome()}catch(_:Exception){Toast.makeText(this,"날짜와 근무 이름을 확인해 주세요",Toast.LENGTH_LONG).show()}}.show()
  }
  private fun showRules(){init("알람 규칙");body.addView(btn("+ 새 알람 규칙") {ruleDialog(null)},inset(0,0,0,14));body.addView(text("고정 시각 또는 근무 시작 기준으로 알람을 지정합니다. 야간 근무처럼 자정을 넘기는 일정도 지원해요.",13,false,gray),inset(0,0,0,15))
@@ -131,7 +131,7 @@ class MainActivity:Activity(){
   val name=EditText(this).apply{hint="예: 순찰";setText(original?.optString("name")?:"")}
   val shift=Spinner(this).apply{
    adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,Engine.shiftTypes(j))
-   setSelection(Engine.shiftTypes(j).indexOf(original?.optString("shift")?:"야간").coerceAtLeast(0))
+   setSelection(Engine.shiftTypes(j).indexOf(original?.optString("shift")?:"휴무").coerceAtLeast(0))
   }
   val mode=Spinner(this).apply{
    adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,listOf("고정 시각", "근무 시작 기준"))
@@ -197,35 +197,68 @@ class MainActivity:Activity(){
  }
  private fun shiftTimeDialog(){
   val j=Engine.data(this)
-  val root=layout().apply{setPadding(dp(18),dp(10),dp(18),0)}
+  val root=layout().apply{setPadding(dp(18),dp(10),dp(18),dp(10))}
   val times=JSONObject((j.optJSONObject("shiftTimes")?:JSONObject()).toString())
-  val names=Engine.shiftTypes(j).filter{it!="휴무"}
-  for(shift in names){
-   root.addView(text("$shift 시작 시각",13,true,gray),inset(0,10,0,2))
-   var total=times.optInt(shift,when(shift){"주간"->480;"야간"->1080;else->540})
-   val button=Button(this).apply{
-    text="%02d:%02d".format(total/60,total%60)
-    setOnClickListener{TimePickerDialog(this@MainActivity,{_,h,m->total=h*60+m;times.put(shift,total);text="%02d:%02d".format(h,m)},total/60,total%60,true).show()}
-   }
-   root.addView(button)
+  fun saveTimes(){
+   j.put("shiftTimes",times)
+   Engine.save(this,j)
+   Engine.schedule(this)
   }
-  root.addView(text("데이, 이브닝, 나이트 등 원하는 근무 유형을 추가할 수 있어요.",12,false,gray),inset(0,16,0,4))
-  val saveChanges={
-   j.put("shiftTimes",times);Engine.save(this,j);Engine.schedule(this)
+  val names=Engine.shiftTypes(j).filter{it!="휴무"}
+  if(names.isEmpty())root.addView(text("등록된 근무 유형이 없어요. 아래에서 자유롭게 추가하세요.",14,false,gray))
+  for(shiftName in names){
+   val line=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+   line.addView(text(shiftName,15,true),LinearLayout.LayoutParams(0,-2,1f))
+   var total=times.optInt(shiftName,540)
+   val timeButton=btn("%02d:%02d".format(total/60,total%60)){
+    TimePickerDialog(this@MainActivity,{_,h,m->
+     total=h*60+m
+     times.put(shiftName,total)
+     saveTimes()
+     shiftTimeDialog()
+    },total/60,total%60,true).show()
+   }
+   line.addView(timeButton)
+   line.addView(btn("삭제"){
+    AlertDialog.Builder(this).setTitle("$shiftName 삭제")
+     .setMessage("해당 근무 유형과 연결된 알람 규칙 및 근무표 항목도 휴무로 변경됩니다. 계속할까요?")
+     .setNegativeButton("취소",null)
+     .setPositiveButton("삭제"){_,_->
+      val arr=JSONArray()
+      for(n in Engine.shiftTypes(j))if(n!="휴무"&&n!=shiftName)arr.put(n)
+      j.put("customShifts",arr)
+      j.optJSONObject("shiftTimes")?.remove(shiftName)
+      val pattern=j.getJSONArray("pattern")
+      for(k in 0 until pattern.length())if(pattern.getString(k)==shiftName)pattern.put(k,"휴무")
+      val overrides=j.getJSONObject("overrides")
+      val keys=overrides.keys()
+      while(keys.hasNext()){val key=keys.next();if(overrides.optString(key)==shiftName)overrides.put(key,"휴무")}
+      val rules=j.getJSONArray("rules")
+      for(k in 0 until rules.length())if(rules.getJSONObject(k).optString("shift")==shiftName)rules.getJSONObject(k).put("enabled",false)
+      Engine.save(this,j);Engine.schedule(this);showSettings()
+     }.show()
+   })
+   root.addView(line,inset(0,5,0,5))
   }
   root.addView(btn("+ 근무 유형 추가"){
-   val entry=EditText(this).apply{hint="예: 이브닝"}
-   AlertDialog.Builder(this).setTitle("새 근무 유형").setView(entry).setNegativeButton("취소",null).setPositiveButton("추가"){_,_->
-    val name=entry.text.toString().trim()
-    if(name.isNotEmpty()&&name.length<=20&&name !in Engine.shiftTypes(j)){
-     val arr=j.optJSONArray("customShifts")?:JSONArray()
-     arr.put(name);j.put("customShifts",arr)
-     times.put(name,540);saveChanges();shiftTimeDialog()
-    }else Toast.makeText(this,"새로운 근무 이름을 입력해 주세요 (20자 이하)",Toast.LENGTH_LONG).show()
-   }.show()
-  })
-  AlertDialog.Builder(this).setTitle("근무 유형별 시작 시간").setView(ScrollView(this).apply{addView(root)})
-   .setNegativeButton("취소",null).setPositiveButton("저장"){_,_->saveChanges();showSettings()}.show()
+   val entry=EditText(this).apply{hint="예: 데이, 이브닝, 나이트"}
+   AlertDialog.Builder(this).setTitle("근무 유형 추가").setView(entry)
+    .setNegativeButton("취소",null)
+    .setPositiveButton("추가"){_,_->
+     val name=entry.text.toString().trim()
+     if(name.isNotBlank()&&name.length<=20&&name !in Engine.shiftTypes(j)){
+      val arr=j.optJSONArray("customShifts")?:JSONArray()
+      arr.put(name);j.put("customShifts",arr)
+      times.put(name,540)
+      saveTimes()
+      showSettings()
+      shiftTimeDialog()
+     }else Toast.makeText(this,"중복되지 않는 이름을 입력해 주세요 (20자 이하)",Toast.LENGTH_LONG).show()
+    }.show()
+  },inset(0,12,0,0))
+  AlertDialog.Builder(this).setTitle("근무 유형 및 시작 시간")
+   .setView(ScrollView(this).apply{addView(root)})
+   .setPositiveButton("닫기"){_,_->showSettings()}.show()
  }
  private fun stopPreview(){preview?.release();preview=null}
  override fun onPause(){stopPreview();super.onPause()}
