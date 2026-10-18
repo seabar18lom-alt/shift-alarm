@@ -9,27 +9,51 @@ import java.time.format.DateTimeFormatter
 
 object Engine {
     const val CHANNEL="shift_alarm_channel_v2"
-    val types = listOf("주간", "야간", "휴무", "특근")
     fun shiftTypes(j:JSONObject):List<String>{
-        val result=types.toMutableList()
-        val extra=j.optJSONArray("customShifts")
-        if(extra!=null)for(i in 0 until extra.length()){
-            val name=extra.optString(i).trim()
-            if(name.isNotEmpty()&&!result.contains(name))result.add(name)
+        val result=mutableListOf("휴무")
+        val registered=j.optJSONArray("customShifts")
+        if(registered!=null)for(i in 0 until registered.length()){
+            val n=registered.optString(i).trim()
+            if(n.isNotEmpty()&&n!="휴무"&&n !in result)result.add(n)
         }
         return result
     }
+    private fun migrate(j:JSONObject):JSONObject {
+        if(j.has("shiftTypesMigrated"))return j
+        val names=linkedSetOf<String>()
+        fun add(n:String){if(n.isNotBlank()&&n!="휴무")names.add(n)}
+        val saved=j.optJSONArray("customShifts")
+        if(saved!=null)for(i in 0 until saved.length())add(saved.optString(i))
+        val pattern=j.optJSONArray("pattern")
+        if(pattern!=null)for(i in 0 until pattern.length())add(pattern.optString(i))
+        val overrides=j.optJSONObject("overrides")
+        if(overrides!=null){val keys=overrides.keys();while(keys.hasNext()){add(overrides.optString(keys.next()))}}
+        val rules=j.optJSONArray("rules")
+        if(rules!=null)for(i in 0 until rules.length())add(rules.optJSONObject(i)?.optString("shift")?:"")
+        // Keep existing user time definitions, but do not preserve unused legacy special duty.
+        val times=j.optJSONObject("shiftTimes")
+        if(times!=null){val keys=times.keys();while(keys.hasNext()){
+            val n=keys.next()
+            if(n!="특근"||n in names)add(n)
+        }}
+        j.put("customShifts",JSONArray(names.toList()))
+        j.put("shiftTypesMigrated",true)
+        return j
+    }
     fun data(c:Context): JSONObject {
         val raw=c.getSharedPreferences("shift",0).getString("data",null)
-        if(raw!=null) return try { JSONObject(raw) } catch(_:Exception){ defaultData() }
+        if(raw!=null) return try { migrate(JSONObject(raw)).also{save(c,it)} } catch(_:Exception){ defaultData() }
         return defaultData().also{save(c,it)}
     }
     fun defaultData():JSONObject {
-        val rules=JSONArray()
-        fun add(n:String,s:String,m:String,min:Int){rules.put(JSONObject().put("id",System.nanoTime()+rules.length()).put("name",n).put("shift",s).put("mode",m).put("minute",min).put("enabled",true))}
-        add("출근 준비","주간","relative",-60);add("오전 순찰","주간","relative",120);add("휴식 종료","주간","relative",300)
-        add("출근 준비","야간","relative",-60);add("야간 순찰","야간","relative",240);add("휴식 종료","야간","relative",480)
-        return JSONObject().put("shiftTimes",JSONObject().put("주간",480).put("야간",1080).put("특근",540)).put("anchor",LocalDate.now().toString()).put("pattern",JSONArray(listOf("주간","야간","휴무","휴무"))).put("overrides",JSONObject()).put("rules",rules)
+        return JSONObject()
+            .put("shiftTypesMigrated",true)
+            .put("customShifts",JSONArray())
+            .put("shiftTimes",JSONObject())
+            .put("anchor",LocalDate.now().toString())
+            .put("pattern",JSONArray(listOf("휴무")))
+            .put("overrides",JSONObject())
+            .put("rules",JSONArray())
     }
     fun save(c:Context,j:JSONObject){c.getSharedPreferences("shift",0).edit().putString("data",j.toString()).apply()}
     fun shift(j:JSONObject,d:LocalDate):String {
@@ -38,7 +62,7 @@ object Engine {
         val diff=java.time.temporal.ChronoUnit.DAYS.between(LocalDate.parse(j.getString("anchor")),d).toInt()
         return p.getString(Math.floorMod(diff,p.length()))
     }
-    fun startMinutes(j:JSONObject,shift:String)=j.optJSONObject("shiftTimes")?.optInt(shift,when(shift){"주간"->480;"야간"->1080;"특근"->540;else->0})?:0
+    fun startMinutes(j:JSONObject,shift:String)=j.optJSONObject("shiftTimes")?.optInt(shift,0)?:0
     data class Event(val id:Long,val name:String,val time:ZonedDateTime,val shift:String)
     fun events(j:JSONObject,date:LocalDate):List<Event>{
         val typ=shift(j,date);val a=j.getJSONArray("rules");val out=mutableListOf<Event>()
