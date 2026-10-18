@@ -42,6 +42,20 @@ class MainActivity:Activity(){
   hero.addView(text("다음 알람",12,false,Color.rgb(160,183,236)),inset(0,24,0,3))
   hero.addView(text(if(upcoming!=null)"${Engine.time(upcoming.time)}  ·  ${upcoming.name}" else "예정 없음",19,true,Color.WHITE))
   body.addView(hero,inset(0,0,0,26))
+  val quick=card()
+  quick.addView(text("빠른 알람",19,true),inset(0,0,0,8))
+  val quickRow=layout(false)
+  for((label,mins) in listOf("5분" to 5,"15분" to 15,"30분" to 30,"1시간" to 60)){
+   quickRow.addView(btn(label){setQuickAlarm(mins)},LinearLayout.LayoutParams(0,dp(48),1f))
+  }
+  quick.addView(quickRow)
+  val quickPrefs=getSharedPreferences("quick_alarm",0)
+  val quickAt=quickPrefs.getLong("time",0L)
+  if(quickAt>System.currentTimeMillis()){
+   quick.addView(text("예약됨: "+java.time.Instant.ofEpochMilli(quickAt).atZone(java.time.ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("M월 d일 HH:mm")),13,false,gray),inset(0,10,0,4))
+   quick.addView(btn("빠른 알람 취소"){cancelQuickAlarm();showHome()})
+  }
+  body.addView(quick,inset(0,0,0,20))
   val header=layout(false).apply{gravity=Gravity.CENTER_VERTICAL};header.addView(text("근무 캘린더",19,true),LinearLayout.LayoutParams(0,-2,1f));header.addView(btn("패턴 설정") {patternDialog()});body.addView(header,inset(0,0,0,10))
   val cal=card();val bar=layout(false).apply{gravity=Gravity.CENTER_VERTICAL};bar.addView(btn("‹"){month=month.minusMonths(1);showHome()});bar.addView(text(month.format(DateTimeFormatter.ofPattern("yyyy년 M월")),16,true).apply{gravity=Gravity.CENTER},LinearLayout.LayoutParams(0,-2,1f));bar.addView(btn("›"){month=month.plusMonths(1);showHome()});cal.addView(bar)
   val grid=GridLayout(this).apply{columnCount=7};listOf("일","월","화","수","목","금","토").forEach{grid.addView(text(it,12,true,gray).apply{gravity=Gravity.CENTER},GridLayout.LayoutParams().apply{width=0;height=dp(35);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f)})}
@@ -56,6 +70,31 @@ class MainActivity:Activity(){
   val list=card();val events=Engine.events(j,selected);if(events.isEmpty())list.addView(text("등록된 알람이 없어요.",13,false,gray))
   for(e in events){val line=layout(false).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(0,dp(9),0,dp(9))};line.addView(text("◷",23,true,blue),LinearLayout.LayoutParams(dp(43),-2));line.addView(text(e.name,15,true),LinearLayout.LayoutParams(0,-2,1f));line.addView(text(Engine.time(e.time),15,true));list.addView(line)}
   body.addView(list)
+ }
+ private fun quickIntent():PendingIntent {
+  val intent=Intent(this,AlarmReceiver::class.java).setAction("com.shiftalarm.app.QUICK_ALARM")
+   .putExtra("title","빠른 알람")
+  return PendingIntent.getBroadcast(this,991711,intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+ }
+ private fun cancelQuickAlarm(){
+  getSystemService(AlarmManager::class.java).cancel(quickIntent())
+  getSharedPreferences("quick_alarm",0).edit().remove("time").apply()
+ }
+ private fun setQuickAlarm(minutes:Int){
+  cancelQuickAlarm()
+  val at=System.currentTimeMillis()+minutes*60_000L
+  val alarm=getSystemService(AlarmManager::class.java)
+  try{
+   if(Build.VERSION.SDK_INT>=31&&!alarm.canScheduleExactAlarms()){
+    Toast.makeText(this,"정확한 알람 권한을 허용한 뒤 다시 설정해 주세요",Toast.LENGTH_LONG).show()
+    startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(android.net.Uri.parse("package:$packageName")))
+    return
+   }
+   alarm.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,at,quickIntent())
+   getSharedPreferences("quick_alarm",0).edit().putLong("time",at).apply()
+   Toast.makeText(this,"$minutes 분 후 알람을 예약했어요",Toast.LENGTH_SHORT).show()
+   showHome()
+  }catch(_:Exception){Toast.makeText(this,"알람을 예약하지 못했어요. 권한을 확인해 주세요",Toast.LENGTH_LONG).show()}
  }
  private fun shiftDialog(date:LocalDate){val choices=Engine.types.toTypedArray();val current=Engine.shift(Engine.data(this),date);AlertDialog.Builder(this).setTitle("${date} 근무 지정").setSingleChoiceItems(choices,choices.indexOf(current)){dialog,index->val j=Engine.data(this);j.getJSONObject("overrides").put(date.toString(),choices[index]);Engine.save(this,j);Engine.schedule(this);dialog.dismiss();showHome()}.setNeutralButton("반복 패턴 복원"){_,_->val j=Engine.data(this);j.getJSONObject("overrides").remove(date.toString());Engine.save(this,j);Engine.schedule(this);showHome()}.setNegativeButton("취소",null).show()}
  private fun patternDialog(){val j=Engine.data(this);val view=layout().apply{setPadding(dp(20),dp(12),dp(20),0)};val anchor=EditText(this).apply{setText(j.getString("anchor"));hint="2026-10-18"};val pattern=EditText(this).apply{setText((0 until j.getJSONArray("pattern").length()).joinToString(", "){j.getJSONArray("pattern").getString(it)});hint="주간, 야간, 휴무, 휴무"};view.addView(text("기준 날짜 (YYYY-MM-DD)",13));view.addView(anchor);view.addView(text("반복 순서 (쉼표 구분)",13));view.addView(pattern)
