@@ -15,14 +15,18 @@ class AlarmService:Service(){
   if(intent?.action==STOP){stopSelf();return START_NOT_STICKY}
   if(intent==null){stopSelf();return START_NOT_STICKY}
   Engine.channel(this)
-  val screen=Intent(this,RingingActivity::class.java).putExtra("title",intent.getStringExtra("title")?:"근무 알람").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+  val options=getSharedPreferences("alarm_options",0)
+  val selected=options.getStringSet("math_alarm_keys",null)
+  val alarmKey=intent.getStringExtra("alarm_key")?:""
+  val challenge=options.getBoolean("math_to_dismiss",false) && (selected?.contains(alarmKey)?:true)
+  val screen=Intent(this,RingingActivity::class.java).putExtra("title",intent.getStringExtra("title")?:"근무 알람").putExtra("challenge",challenge).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
   val open=PendingIntent.getActivity(this,0,screen,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
   val stop=PendingIntent.getService(this,1,Intent(this,AlarmService::class.java).setAction(STOP),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
   val notification=Notification.Builder(this,Engine.CHANNEL).setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
    .setContentTitle("교대알람 · ${intent.getStringExtra("title")?:"근무 알람"}")
    .setContentText("알람 종료를 누르면 소리가 멈춥니다.").setCategory(Notification.CATEGORY_ALARM)
    .setVisibility(Notification.VISIBILITY_PUBLIC).setOngoing(true).setContentIntent(open).setFullScreenIntent(open,true)
-   .apply { if (!getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false)) addAction(Notification.Action.Builder(null,"알람 종료",stop).build()) }.build()
+   .apply { if (!challenge) addAction(Notification.Action.Builder(null,"알람 종료",stop).build()) }.build()
   if(Build.VERSION.SDK_INT>=29)startForeground(100,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)else startForeground(100,notification)
   if(player==null){
    wakeLock=getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"shiftalarm:ring").apply{acquire(10*60*1000L)}
