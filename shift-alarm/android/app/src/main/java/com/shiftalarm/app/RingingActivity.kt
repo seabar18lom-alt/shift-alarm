@@ -41,7 +41,7 @@ class RingingActivity:Activity(){
    val answer=when(operation){0->a+b;1->a*b;else->a-b}
    val symbol=when(operation){0->"+";1->"×";else->"−"}
    val problem=TextView(this).apply{
-    text="문제를 풀면 알람이 꺼집니다.\\n$a $symbol $b = ?"
+    text="문제를 풀면 알람이 꺼집니다.\n$a $symbol $b = ?"
     textSize=22f;setTextColor(Color.WHITE);gravity=Gravity.CENTER
    }
    bg.addView(problem)
