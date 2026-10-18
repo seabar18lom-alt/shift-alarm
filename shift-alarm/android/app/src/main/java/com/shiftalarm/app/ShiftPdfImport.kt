@@ -52,13 +52,17 @@ object ShiftPdfImport {
    // Prefer coordinates over extraction order for split heading glyphs.
    val heading=uniqueGlyphs.filter{it.y<110f}.sortedWith(compareBy<Glyph>{it.y}.thenBy{it.x}).joinToString(""){it.text}
    val normalized=heading.replace(Regex("\\s+"),"")
-   val first=Regex("(20\\d{2})년(1[0-2]|0?[1-9])월").find(normalized)
+   val collapsed=Regex("(.)\\\\1").replace(normalized,"$1")
+   val first=Regex("(20\\d{2})년(1[0-2]|0?[1-9])월").find(collapsed)
+      ?:Regex("(20\\d{2})년(1[0-2]|0?[1-9])월").find(normalized)
       ?:Regex("(20\\d{2}).{0,8}?(1[0-2]|0?[1-9])월").find(normalized)
       ?:Regex("(20\\d{2})년\\s*(\\d{1,2})월").find(plain)
    val year=first?.groupValues?.get(1)?.toIntOrNull()
+      ?:Regex("20\\d{2}").find(collapsed)?.value?.toIntOrNull()
       ?:Regex("20\\d{2}").find(normalized)?.value?.toIntOrNull()
       ?:error("연도를 찾지 못했어요. 제목 추출: "+normalized.take(65))
    val month=first?.groupValues?.get(2)?.toIntOrNull()
+      ?:Regex("(1[0-2]|0?[1-9])월").find(collapsed)?.groupValues?.get(1)?.toIntOrNull()
       ?:Regex("(1[0-2]|0?[1-9])월").find(normalized)?.groupValues?.get(1)?.toIntOrNull()
       ?:error("월을 찾지 못했어요. 제목 추출: "+normalized.take(65))
    val maxDay=LocalDate.of(year,month,1).lengthOfMonth()
