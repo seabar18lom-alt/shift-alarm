@@ -278,6 +278,23 @@ class MainActivity:Activity(){
  }
  private fun showSettings(){init("설정");body.addView(audioSettings(),inset(0,0,0,16));val challenge=card();challenge.addView(text("알람 해제 미션",19,true));val challengeToggle=Switch(this).apply{text="수학 문제를 풀어야 알람 종료";isChecked=getSharedPreferences("alarm_options",0).getBoolean("math_to_dismiss",false);setOnCheckedChangeListener{_,enabled->getSharedPreferences("alarm_options",0).edit().putBoolean("math_to_dismiss",enabled).apply()}};challenge.addView(challengeToggle);challenge.addView(text("사용할 알람을 아래에서 각각 선택하세요.",12,false,gray))
   val options=getSharedPreferences("alarm_options",0)
+  fun optionPicker(label:String,key:String,values:List<String>,default:Int){
+   val row=layout(false).apply{gravity=Gravity.CENTER_VERTICAL}
+   row.addView(text(label,14,true),LinearLayout.LayoutParams(0,-2,1f))
+   val spinner=Spinner(this).apply{
+    adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,values)
+    setSelection(options.getInt(key,default).coerceIn(0,values.lastIndex))
+    onItemSelectedListener=object:AdapterView.OnItemSelectedListener{
+     override fun onItemSelected(parent:AdapterView<*>?,view:View?,position:Int,id:Long){options.edit().putInt(key,position).apply()}
+     override fun onNothingSelected(parent:AdapterView<*>?){}
+    }
+   }
+   row.addView(spinner)
+   challenge.addView(row,inset(0,10,0,5))
+  }
+  optionPicker("정답 방식","math_mode",listOf("객관식","주관식","랜덤"),0)
+  optionPicker("문제 난이도","math_difficulty",listOf("쉬움","보통","어려움"),0)
+  challenge.addView(text("미션을 적용할 알람",14,true),inset(0,12,0,5))
   val rules=Engine.data(this).getJSONArray("rules")
   val entries=mutableListOf<Pair<String,String>>()
   for(k in 0 until rules.length()){
