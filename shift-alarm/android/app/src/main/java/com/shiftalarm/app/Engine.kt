@@ -50,7 +50,7 @@ object Engine {
         for(day in -1..59)for(e in events(j,LocalDate.now().plusDays(day.toLong()))) {
             if(!e.time.isAfter(now))continue
             val code=(e.time.toInstant().toEpochMilli().toString()+e.id).hashCode()
-            val intent=Intent(c,AlarmReceiver::class.java).setAction("com.shiftalarm.app.ALARM").putExtra("title",e.name).putExtra("time",e.time.toInstant().toEpochMilli()).putExtra("code",code)
+            val intent=Intent(c,AlarmReceiver::class.java).setAction("com.shiftalarm.app.ALARM").putExtra("title",e.name).putExtra("time",e.time.toInstant().toEpochMilli()).putExtra("code",code).putExtra("alarm_key",e.id.toString())
             val pi=PendingIntent.getBroadcast(c,code,intent,PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             try {if(Build.VERSION.SDK_INT>=31&&manager.canScheduleExactAlarms())manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,e.time.toInstant().toEpochMilli(),pi)
             else if(Build.VERSION.SDK_INT<31)manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,e.time.toInstant().toEpochMilli(),pi)
